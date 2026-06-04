@@ -1,8 +1,14 @@
 import os
 import time
-import webserver
 import discord
 from discord.ext import commands
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def home():
+    return {"message": "Hello from Python on Vercel!"}
 
 START_VOICE_CHANNEL_ID = 1474894816088162365  
 TARGET_VOICE_CHANNEL_ID = 1339052615832567811
@@ -220,5 +226,4 @@ async def on_ready():
     else:
         print(f"Warning: Channel ID {CONTROL_PANEL_CHANNEL_ID} not accessible.")
 
-webserver.keep_alive()
 bot.run(os.environ['TOKEN'])
