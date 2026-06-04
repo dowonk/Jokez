@@ -1,2 +1,10 @@
+[project]
+name = "jokez"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.117.1",
+]
+
 [tool.vercel]
-entrypoint = "src/main.py"
+entrypoint = "main.py"
