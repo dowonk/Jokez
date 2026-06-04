@@ -1,2 +1,2 @@
 [tool.vercel]
-entrypoint = "Jokez/main.py"
+entrypoint = "main.py"
