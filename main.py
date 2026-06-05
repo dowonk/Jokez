@@ -1,15 +1,19 @@
 import os
 import time
+import asyncio
+import threading
 import discord
 from discord.ext import commands
-from fastapi import FastAPI
+from flask import Flask, jsonify
 
-app = FastAPI()
+# 1. Initialize Flask
+app = Flask(__name__)
 
-@app.get("/")
+@app.route("/")
 def home():
-    return {"message": "Hello from Python on Vercel!"}
+    return jsonify({"message": "Hello from Python on Vercel!"})
 
+# 2. Discord Bot Configuration
 START_VOICE_CHANNEL_ID = 1474894816088162365  
 TARGET_VOICE_CHANNEL_ID = 1339052615832567811
 ALT_SOURCE_VOICE_CHANNEL_ID = 1472654310696419349  
@@ -174,12 +178,14 @@ class ControlPanelView(discord.ui.View):
             ephemeral=True
         )
 
+
 @bot.command(name="shutdown")
 @commands.is_owner()
 async def shutdown(ctx):
     await ctx.send("Shutting down")
     print(f"Shutdown requested by {ctx.author}. Closing gateway connection...")
     await bot.close()
+
 
 @shutdown.error
 async def shutdown_error(ctx, error):
@@ -236,4 +242,20 @@ async def on_ready():
     else:
         print(f"Warning: Channel ID {CONTROL_PANEL_CHANNEL_ID} not accessible.")
 
-bot.run(os.environ['TOKEN'])
+
+# 3. Handle threading to allow Flask and discord.py to run concurrently
+def run_discord_bot():
+    # Uses a fresh event loop inside a separate worker thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(bot.start(os.environ['TOKEN']))
+
+if "TOKEN" in os.environ:
+    bot_thread = threading.Thread(target=run_discord_bot, daemon=True)
+    bot_thread.start()
+else:
+    print("Warning: TOKEN environment variable not found. Discord bot skipped.")
+
+# Expose app for Vercel WSGI environment
+if __name__ == "__main__":
+    app.run(debug=True)
