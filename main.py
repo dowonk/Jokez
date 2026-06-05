@@ -1,22 +1,18 @@
 import os
 import time
-import asyncio
-import threading
 import discord
 from discord.ext import commands
-from flask import Flask, jsonify
+from fastapi import FastAPI
 
-# 1. Initialize Flask
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route("/")
+@app.get("/")
 def home():
-    return jsonify({"message": "Hello from Python on Vercel!"})
+    return {"message": "Hello from Python on Vercel!"}
 
-# 2. Discord Bot Configuration
 START_VOICE_CHANNEL_ID = 1474894816088162365  
 TARGET_VOICE_CHANNEL_ID = 1339052615832567811
-ALT_SOURCE_VOICE_CHANNEL_ID = 1472654310696419349  
+ALT_SOURCE_VOICE_CHANNEL_ID = 1472654310696419349  # 🛋️┃waiting room channel
 
 TEXT_CHANNEL_ID = 1512195785633042644
 CONTROL_PANEL_CHANNEL_ID = 1512208972436869280  
@@ -43,6 +39,7 @@ class ApproveJoinView(discord.ui.View):
     @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="approve_button_fixed")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
+        # The user started in the waiting room, so we check if they are still there
         start_channel = guild.get_channel(ALT_SOURCE_VOICE_CHANNEL_ID)
         target_channel = guild.get_channel(TARGET_VOICE_CHANNEL_ID)
 
@@ -98,6 +95,7 @@ class RequestJoinView(discord.ui.View):
                 return
 
         log_channel = guild.get_channel(LOG_CHANNEL_ID)
+        # Changed here to check ALT_SOURCE_VOICE_CHANNEL_ID (🛋️┃waiting room)
         waiting_room = guild.get_channel(ALT_SOURCE_VOICE_CHANNEL_ID)
 
         if not waiting_room or interaction.user not in waiting_room.members:
@@ -117,7 +115,7 @@ class RequestJoinView(discord.ui.View):
         request_cooldowns[user_id] = current_time + 60
 
         approval_view = ApproveJoinView(target_user=interaction.user)
-        mention_text = f"<@&{BOUNCERS_ROLE_ID}>{interaction.user.mention} has requested to join 🤣┃jokez"
+        mention_text = f"{interaction.user.mention} has requested to join 🤣┃jokez"
 
         await log_channel.send(content=mention_text, view=approval_view)
 
@@ -179,20 +177,6 @@ class ControlPanelView(discord.ui.View):
         )
 
 
-@bot.command(name="shutdown")
-@commands.is_owner()
-async def shutdown(ctx):
-    await ctx.send("Shutting down")
-    print(f"Shutdown requested by {ctx.author}. Closing gateway connection...")
-    await bot.close()
-
-
-@shutdown.error
-async def shutdown_error(ctx, error):
-    if isinstance(error, commands.NotOwner):
-        await ctx.send("Only the bot owner can use this command.", delete_after=10)
-
-
 @bot.event
 async def on_ready():
     print(f'Bot is online as {bot.user}')
@@ -242,20 +226,4 @@ async def on_ready():
     else:
         print(f"Warning: Channel ID {CONTROL_PANEL_CHANNEL_ID} not accessible.")
 
-
-# 3. Handle threading to allow Flask and discord.py to run concurrently
-def run_discord_bot():
-    # Uses a fresh event loop inside a separate worker thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(bot.start(os.environ['TOKEN']))
-
-if "TOKEN" in os.environ:
-    bot_thread = threading.Thread(target=run_discord_bot, daemon=True)
-    bot_thread.start()
-else:
-    print("Warning: TOKEN environment variable not found. Discord bot skipped.")
-
-# Expose app for Vercel WSGI environment
-if __name__ == "__main__":
-    app.run(debug=True)
+bot.run(os.environ['TOKEN'])
