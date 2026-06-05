@@ -1,5 +1,6 @@
 import os
 import time
+import webserver
 import discord
 from discord.ext import commands
 
@@ -225,4 +226,5 @@ async def on_ready():
 		else:
 				print(f"Warning: Channel ID {CONTROL_PANEL_CHANNEL_ID} not accessible.")
 
+webserver.keep_alive()
 bot.run(os.environ['TOKEN'])
