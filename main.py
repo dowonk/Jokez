@@ -2,17 +2,10 @@ import os
 import time
 import discord
 from discord.ext import commands
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def home():
-    return {"message": "Hello from Python on Vercel!"}
 
 START_VOICE_CHANNEL_ID = 1474894816088162365  
 TARGET_VOICE_CHANNEL_ID = 1339052615832567811
-ALT_SOURCE_VOICE_CHANNEL_ID = 1472654310696419349  # 🛋️┃waiting room channel
+ALT_SOURCE_VOICE_CHANNEL_ID = 1472654310696419349  
 
 TEXT_CHANNEL_ID = 1512195785633042644
 CONTROL_PANEL_CHANNEL_ID = 1512208972436869280  
@@ -30,7 +23,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 request_cooldowns = {}
 
-
 class ApproveJoinView(discord.ui.View):
     def __init__(self, target_user: discord.Member):
         super().__init__(timeout=None)
@@ -39,7 +31,6 @@ class ApproveJoinView(discord.ui.View):
     @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="approve_button_fixed")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
-        # The user started in the waiting room, so we check if they are still there
         start_channel = guild.get_channel(ALT_SOURCE_VOICE_CHANNEL_ID)
         target_channel = guild.get_channel(TARGET_VOICE_CHANNEL_ID)
 
@@ -95,7 +86,6 @@ class RequestJoinView(discord.ui.View):
                 return
 
         log_channel = guild.get_channel(LOG_CHANNEL_ID)
-        # Changed here to check ALT_SOURCE_VOICE_CHANNEL_ID (🛋️┃waiting room)
         waiting_room = guild.get_channel(ALT_SOURCE_VOICE_CHANNEL_ID)
 
         if not waiting_room or interaction.user not in waiting_room.members:
