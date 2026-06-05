@@ -115,7 +115,7 @@ class RequestJoinView(discord.ui.View):
         request_cooldowns[user_id] = current_time + 60
 
         approval_view = ApproveJoinView(target_user=interaction.user)
-        mention_text = f"{interaction.user.mention} has requested to join 🤣┃jokez"
+        mention_text = f"<@&{BOUNCERS_ROLE_ID}>{interaction.user.mention} has requested to join 🤣┃jokez"
 
         await log_channel.send(content=mention_text, view=approval_view)
 
