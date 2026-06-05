@@ -1,15 +1,20 @@
-from flask import Flask
-from threading import Thread
+import os
+import threading
+import asyncio
+from flask import Flask, jsonify
+from main import bot  # Imports your bot instance from main.py
 
-app = Flask('')
+app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return "Hello!"
+    return jsonify({"status": "Discord bot wrapper is running."})
 
-def run():
-  app.run(host='0.0.0.0',port=8080)
+def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    bot.run(os.environ.get('TOKEN'))
 
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
+# Start the bot in the background so Flask can finish loading
+if "TOKEN" in os.environ:
+    threading.Thread(target=run_bot, daemon=True).start()
