@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+from datetime import datetime, timezone, timedelta
 import discord
 from discord.ext import commands
 
@@ -14,10 +15,12 @@ VIP_VOICE = 1459658590347460782
 JOIN_VOICE_CHANNEL = 1512195785633042644
 CONTROL_PANEL_CHANNEL = 1512208972436869280
 REQUESTS_CHANNEL = 1512205620751765515
+CROWS_CHANNEL = 1356415359367778498
 
 PINK_ROLE = 1339053520934146058
 AUDIENCE_ROLE = 1339057300098252820
 BOUNCER_ROLE = 1339058493520478240
+KAWKAW_ROLE = 1356415745285689344
 
 PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 
@@ -29,12 +32,16 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 request_cooldowns = {}
 
 class ApproveJoinView(discord.ui.View):
-    def __init__(self, target_user: discord.Member):
+    def __init__(self, target_user: discord.Member = None):
         super().__init__(timeout=None)
         self.target_user = target_user
 
     @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="approve_button_fixed")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.target_user:
+            await interaction.response.send_message("Error: Session expired for this request.", ephemeral=True)
+            return
+
         guild = interaction.guild
         start_channel = guild.get_channel(WAITING_ROOM_VOICE)
         target_channel = guild.get_channel(JOKEZ_VOICE)
@@ -130,7 +137,7 @@ class ControlPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="🤣┃jokez", style=discord.ButtonStyle.success, custom_id="move_all_to_jokez_fixed")
+    @discord.ui.button(label="Move all users to 🤣┃jokez", style=discord.ButtonStyle.success, custom_id="move_to_jokez_fixed")
     async def move_to_jokez_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         author = interaction.user
@@ -181,7 +188,7 @@ class ControlPanelView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_all_to_crows_fixed")
+    @discord.ui.button(label="Move all users to 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_to_crows_fixed")
     async def move_to_crows_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         author = interaction.user
@@ -286,8 +293,49 @@ class ControlPanelView(discord.ui.View):
             ephemeral=True
         )
 
+    @discord.ui.button(label="📢┃Crow Alert", style=discord.ButtonStyle.secondary, custom_id="kawkaw_button_fixed", row=1)
+    async def kawkaw_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        ping_channel = guild.get_channel(CROWS_CHANNEL)
+
+        if not ping_channel:
+            await interaction.response.send_message("Error: Kawkaw channel not found.", ephemeral=True)
+            return
+
+        now = datetime.now(timezone.utc)
+        target_hours = [1, 4, 7, 10, 13, 16, 19, 22]
+        future_times = []
+
+        for hour in target_hours:
+            t = now.replace(hour=hour, minute=30, second=0, microsecond=0)
+            if t < now:
+                t += timedelta(days=1)
+            future_times.append(t)
+
+        closest_target = min(future_times)
+        delta = closest_target - now
+
+        # Convert remaining time to total minutes (rounded down)
+        total_minutes = int(delta.total_seconds()) // 60
+        hours, minutes = divmod(total_minutes, 60)
+
+        # Apply custom time format
+        if hours > 0:
+            time_str = f"{hours} hours, {minutes} minutes"
+        else:
+            time_str = f"{minutes} minutes"
+
+        try:
+            await ping_channel.send(f"<@&{KAWKAW_ROLE}> - An officer ({interaction.user.mention}) is requesting your attention! (Time until next: **{time_str}**)")
+            await interaction.response.send_message(f"Successfully pinged <@&{KAWKAW_ROLE}> in {ping_channel.mention}.", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("Error: Bot does not have permission to post in that channel.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
+
 @bot.event
 async def on_ready():
+    bot.add_view(ApproveJoinView())
     bot.add_view(RequestJoinView())
     bot.add_view(ControlPanelView())
 
@@ -320,7 +368,7 @@ async def on_ready():
         if not ctrl_exists:
             embed = discord.Embed(
                 title="Control Panel",
-                description=f"Move all users to <#{JOKEZ_VOICE}>, <#{CROWS_VOICE}>, or <#{VIP_VOICE}>.",
+                description="Welcome to the Control Panel. Click the respective buttons for their intended use.",
                 color=PANEL_COLOR
             )
             await ctrl_channel.send(embed=embed, view=ControlPanelView())
