@@ -1,8 +1,6 @@
 import os
 import time
-import asyncio
 import discord
-import webserver
 from discord.ext import commands
 
 # 1. Discord Bot Configuration
@@ -234,9 +232,5 @@ async def on_ready():
     else:
         print(f"Warning: Channel ID {CONTROL_PANEL_CHANNEL_ID} not accessible.")
 
-webserver.keep_alive()
-# 2. Run Bot
-if "TOKEN" in os.environ:
-    bot.run(os.environ['TOKEN'])
-else:
-    print("Error: TOKEN environment variable not found. Unable to start bot.")
+# Note: The active running block is omitted here. 
+# webserver.py handles running the bot upon initialization.
