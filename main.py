@@ -313,20 +313,16 @@ class ControlPanelView(discord.ui.View):
             future_times.append(t)
 
         closest_target = min(future_times)
-        delta = closest_target - now
-
-        # Convert remaining time to total minutes (rounded down)
-        total_minutes = int(delta.total_seconds()) // 60
-        hours, minutes = divmod(total_minutes, 60)
-
-        # Apply custom time format
-        if hours > 0:
-            time_str = f"{hours} hours, {minutes} minutes"
-        else:
-            time_str = f"{minutes} minutes"
+        
+        # Convert datetime to a 10-digit UNIX timestamp integer
+        unix_timestamp = int(closest_target.timestamp())
 
         try:
-            await ping_channel.send(f"<@&{KAWKAW_ROLE}> - An officer ({interaction.user.mention}) is requesting your attention! (Time until next: **{time_str}**)")
+            # Replaced manual calculation with Discord's native relative timestamp formula (:R)
+            await ping_channel.send(
+                f"{interaction.user.mention} pinged <@&{KAWKAW_ROLE}>\n"
+                f"KAWKAW! Crow spawns <t:{unix_timestamp}:R>!"
+            )
             await interaction.response.send_message(f"Successfully pinged <@&{KAWKAW_ROLE}> in {ping_channel.mention}.", ephemeral=True)
         except discord.Forbidden:
             await interaction.response.send_message("Error: Bot does not have permission to post in that channel.", ephemeral=True)
