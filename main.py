@@ -74,7 +74,7 @@ class RequestJoinView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Request to Join", style=discord.ButtonStyle.blurple, custom_id="request_join_fixed")
+    @discord.ui.button(label="Request", style=discord.ButtonStyle.blurple, custom_id="request_join_fixed")
     async def request_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         user_id = interaction.user.id
