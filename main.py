@@ -1,6 +1,5 @@
 import os
 import time
-import asyncio
 from datetime import datetime, timezone, timedelta
 import discord
 from discord.ext import commands
@@ -31,18 +30,56 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 request_cooldowns = {}
 
-class ApproveJoinView(discord.ui.View):
-    def __init__(self, target_user: discord.Member = None):
-        super().__init__(timeout=None)
-        self.target_user = target_user
+async def _mass_move_users(interaction: discord.Interaction, source_ids: list, target_id: int):
+    guild = interaction.guild
+    author = interaction.user
 
-    @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="approve_button_fixed")
+    if not author.voice or not author.voice.channel:
+        await interaction.response.send_message("You must be connected to a voice channel.", ephemeral=True)
+        return
+
+    target_channel = guild.get_channel(target_id)
+    if not target_channel:
+        await interaction.response.send_message("Error: Target voice channel not found.", ephemeral=True)
+        return
+
+    channels_to_sweep = [guild.get_channel(cid) for cid in source_ids if guild.get_channel(cid)]
+    if not channels_to_sweep:
+        await interaction.response.send_message("Error: No valid source channels found.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    moved_count = 0
+    for channel in channels_to_sweep:
+        for member in channel.members:
+            try:
+                await member.move_to(target_channel)
+                moved_count += 1
+            except Exception:
+                continue
+
+    await interaction.followup.send(
+        f"Moved **{moved_count}** member(s) to {target_channel.mention}.", 
+        ephemeral=True
+    )
+
+class DynamicApproveJoinView(discord.ui.View):
+    def __init__(self, target_user_id: int = None):
+        super().__init__(timeout=None)
+        if target_user_id:
+            self.approve_button.custom_id = f"approve_user_join:{target_user_id}"
+
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.green)
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.target_user:
-            await interaction.response.send_message("Error: Session expired for this request.", ephemeral=True)
+        try:
+            target_user_id = int(button.custom_id.split(":")[1])
+        except (IndexError, ValueError):
+            await interaction.response.send_message("Error: This request structure is corrupted.", ephemeral=True)
             return
 
         guild = interaction.guild
+        target_user = guild.get_member(target_user_id)
         start_channel = guild.get_channel(WAITING_ROOM_VOICE)
         target_channel = guild.get_channel(JOKEZ_VOICE)
 
@@ -50,32 +87,24 @@ class ApproveJoinView(discord.ui.View):
             await interaction.response.send_message("Error: Voice channels not found.", ephemeral=True)
             return
 
-        if self.target_user not in start_channel.members:
+        if not target_user or target_user not in start_channel.members:
+            user_mention = f"<@{target_user_id}>" if not target_user else target_user.mention
             await interaction.response.send_message(
-                f"{self.target_user.mention} is no longer in the waiting voice channel.", 
+                f"{user_mention} is no longer in the waiting voice channel.", 
                 ephemeral=True
             )
             return
 
         try:
-            await self.target_user.move_to(target_channel)
-
+            await target_user.move_to(target_channel)
             button.disabled = True
             button.label = "Joined"
             button.style = discord.ButtonStyle.secondary
-
             await interaction.response.edit_message(view=self)
-
         except discord.Forbidden:
-            await interaction.response.send_message(
-                "You don't have permission to move members.", 
-                ephemeral=True
-            )
+            await interaction.response.send_message("You don't have permission to move members.", ephemeral=True)
         except Exception as e:
-            await interaction.response.send_message(
-                f"An error occurred: {e}", 
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"An error occurred: {e}", ephemeral=True)
 
 class RequestJoinView(discord.ui.View):
     def __init__(self):
@@ -107,10 +136,7 @@ class RequestJoinView(discord.ui.View):
             return
 
         if not log_channel:
-            await interaction.response.send_message(
-                "Error: Request channel not found.", 
-                ephemeral=True
-            )
+            await interaction.response.send_message("Error: Request channel not found.", ephemeral=True)
             return
 
         request_cooldowns[user_id] = current_time + 60
@@ -119,19 +145,15 @@ class RequestJoinView(discord.ui.View):
             description=f"{interaction.user.mention} has requested to join <#{JOKEZ_VOICE}>",
             color=PANEL_COLOR
         )
-
         if interaction.user.avatar:
             embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.avatar.url)
 
-        approval_view = ApproveJoinView(target_user=interaction.user)
-        mention_text = f"<@&{BOUNCER_ROLE}>"
-
-        await log_channel.send(content=mention_text, embed=embed, view=approval_view)
-
-        await interaction.response.send_message(
-            f"Your request has been sent to <@&{BOUNCER_ROLE}>", 
-            ephemeral=True
+        await log_channel.send(
+            content=f"<@&{BOUNCER_ROLE}>", 
+            embed=embed, 
+            view=DynamicApproveJoinView(target_user_id=interaction.user.id)
         )
+        await interaction.response.send_message(f"Your request has been sent to <@&{BOUNCER_ROLE}>", ephemeral=True)
 
 class ControlPanelView(discord.ui.View):
     def __init__(self):
@@ -139,105 +161,11 @@ class ControlPanelView(discord.ui.View):
 
     @discord.ui.button(label="Move all users to 🤣┃jokez", style=discord.ButtonStyle.success, custom_id="move_to_jokez_fixed")
     async def move_to_jokez_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        author = interaction.user
-
-        if not author.voice or not author.voice.channel:
-            await interaction.response.send_message(
-                "You must be connected to a voice channel.", 
-                ephemeral=True
-            )
-            return
-
-        jokez_channel = guild.get_channel(JOKEZ_VOICE)
-
-        if not jokez_channel:
-            await interaction.response.send_message("Error: Jokez voice channel not found.", ephemeral=True)
-            return
-
-        channels_to_sweep = []
-        for channel_id in [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE]:
-            ch = guild.get_channel(channel_id)
-            if ch:
-                channels_to_sweep.append(ch)
-
-        if not channels_to_sweep:
-            await interaction.response.send_message("Error: No channels found.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-
-        async def safe_move(member):
-            try:
-                await member.move_to(jokez_channel)
-                return True
-            except Exception:
-                return False
-
-        moved_count = 0
-
-        for channel in channels_to_sweep:
-            if not channel.members:
-                continue
-
-            results = await asyncio.gather(*[safe_move(m) for m in channel.members])
-            moved_count += sum(1 for r in results if r)
-
-        await interaction.followup.send(
-            f"Moved **{moved_count}** member(s) to {jokez_channel.mention}.", 
-            ephemeral=True
-        )
+        await _mass_move_users(interaction, [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], JOKEZ_VOICE)
 
     @discord.ui.button(label="Move all users to 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_to_crows_fixed")
     async def move_to_crows_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        author = interaction.user
-
-        if not author.voice or not author.voice.channel:
-            await interaction.response.send_message(
-                "You must be connected to a voice channel.", 
-                ephemeral=True
-            )
-            return
-
-        crows_channel = guild.get_channel(CROWS_VOICE)
-
-        if not crows_channel:
-            await interaction.response.send_message("Error: Crows voice channel not found.", ephemeral=True)
-            return
-
-        channels_to_sweep = []
-        for channel_id in [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE]:
-            ch = guild.get_channel(channel_id)
-            if ch:
-                channels_to_sweep.append(ch)
-
-        if not channels_to_sweep:
-            await interaction.response.send_message("Error: No channels found.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-
-        async def safe_move(member):
-            try:
-                await member.move_to(crows_channel)
-                return True
-            except Exception:
-                return False
-
-        moved_count = 0
-
-        for channel in channels_to_sweep:
-            if not channel.members:
-                continue
-
-            results = await asyncio.gather(*[safe_move(m) for m in channel.members])
-            moved_count += sum(1 for r in results if r)
-
-        await interaction.followup.send(
-            f"Moved **{moved_count}** member(s) to {crows_channel.mention}.", 
-            ephemeral=True
-        )
+        await _mass_move_users(interaction, [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], CROWS_VOICE)
 
     @discord.ui.button(label="Officer Meeting 💎┃vip", style=discord.ButtonStyle.blurple, custom_id="move_bouncers_to_vip_fixed")
     async def move_bouncers_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -245,10 +173,7 @@ class ControlPanelView(discord.ui.View):
         author = interaction.user
 
         if not author.voice or not author.voice.channel:
-            await interaction.response.send_message(
-                "You must be connected to a voice channel.", 
-                ephemeral=True
-            )
+            await interaction.response.send_message("You must be connected to a voice channel.", ephemeral=True)
             return
 
         vip_channel = guild.get_channel(VIP_VOICE)
@@ -256,42 +181,25 @@ class ControlPanelView(discord.ui.View):
             await interaction.response.send_message("Error: VIP voice channel not found.", ephemeral=True)
             return
 
-        channels_to_scan = []
-        for channel_id in [JOKEZ_VOICE, CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE]:
-            channel = guild.get_channel(channel_id)
-            if channel:
-                channels_to_scan.append(channel)
-
+        channels_to_scan = [guild.get_channel(cid) for cid in [JOKEZ_VOICE, CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE] if guild.get_channel(cid)]
         if not channels_to_scan:
             await interaction.response.send_message("Error: No channels found.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
-
         bouncer_role = guild.get_role(BOUNCER_ROLE)
 
-        async def safe_move_bouncer(member):
-            if bouncer_role in member.roles:
-                try:
-                    await member.move_to(vip_channel)
-                    return True
-                except Exception:
-                    return False
-            return False
-
         moved_count = 0
+        for ch in channels_to_scan:
+            for member in ch.members:
+                if bouncer_role in member.roles:
+                    try:
+                        await member.move_to(vip_channel)
+                        moved_count += 1
+                    except Exception:
+                        continue
 
-        for channel in channels_to_scan:
-            if not channel.members:
-                continue
-
-            results = await asyncio.gather(*[safe_move_bouncer(m) for m in channel.members])
-            moved_count += sum(1 for r in results if r)
-
-        await interaction.followup.send(
-            f"Moved **{moved_count}** Bouncer(s) to {vip_channel.mention}.", 
-            ephemeral=True
-        )
+        await interaction.followup.send(f"Moved **{moved_count}** Bouncer(s) to {vip_channel.mention}.", ephemeral=True)
 
     @discord.ui.button(label="📢┃Crow Alert", style=discord.ButtonStyle.secondary, custom_id="kawkaw_button_fixed", row=1)
     async def kawkaw_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -313,15 +221,12 @@ class ControlPanelView(discord.ui.View):
             future_times.append(t)
 
         closest_target = min(future_times)
-        
-        # Convert datetime to a 10-digit UNIX timestamp integer
         unix_timestamp = int(closest_target.timestamp())
 
         try:
-            # Replaced manual calculation with Discord's native relative timestamp formula (:R)
             await ping_channel.send(
                 f"{interaction.user.mention} pinged <@&{KAWKAW_ROLE}>\n"
-                f"KAWKAW! Crow spawns <t:{unix_timestamp}:R>!"
+                f"KAWKAW! Crow spawns in <t:{unix_timestamp}:R>!"
             )
             await interaction.response.send_message(f"Successfully pinged <@&{KAWKAW_ROLE}> in {ping_channel.mention}.", ephemeral=True)
         except discord.Forbidden:
@@ -331,42 +236,21 @@ class ControlPanelView(discord.ui.View):
 
 @bot.event
 async def on_ready():
-    bot.add_view(ApproveJoinView())
     bot.add_view(RequestJoinView())
     bot.add_view(ControlPanelView())
+    bot.add_custom_view_prefix("approve_user_join:", DynamicApproveJoinView)
 
-    req_channel = bot.get_channel(JOIN_VOICE_CHANNEL)
-    if req_channel:
-        req_exists = False
-        async for message in req_channel.history(limit=20):
-            if message.author == bot.user and len(message.embeds) > 0:
-                if message.embeds[0].title == "Request to Join":
-                    req_exists = True
-                    break
+    async def setup_panel(channel_id, title, desc, view_obj):
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            return
+        async for message in channel.history(limit=20):
+            if message.author == bot.user and message.embeds and message.embeds[0].title == title:
+                return
+        embed = discord.Embed(title=title, description=desc, color=PANEL_COLOR)
+        await channel.send(embed=embed, view=view_obj)
 
-        if not req_exists:
-            embed = discord.Embed(
-                title="Request to Join",
-                description="Click the button to request to join the 🤣┃jokez voice channel.",
-                color=PANEL_COLOR
-            )
-            await req_channel.send(embed=embed, view=RequestJoinView())
-
-    ctrl_channel = bot.get_channel(CONTROL_PANEL_CHANNEL)
-    if ctrl_channel:
-        ctrl_exists = False
-        async for message in ctrl_channel.history(limit=20):
-            if message.author == bot.user and len(message.embeds) > 0:
-                if message.embeds[0].title == "Control Panel":
-                    ctrl_exists = True
-                    break
-
-        if not ctrl_exists:
-            embed = discord.Embed(
-                title="Control Panel",
-                description="Welcome to the Control Panel. Click the respective buttons for their intended use.",
-                color=PANEL_COLOR
-            )
-            await ctrl_channel.send(embed=embed, view=ControlPanelView())
+    await setup_panel(JOIN_VOICE_CHANNEL, "Request to Join", "Click the button to request to join the 🤣┃jokez voice channel.", RequestJoinView())
+    await setup_panel(CONTROL_PANEL_CHANNEL, "Control Panel", "Welcome to the Control Panel. Click the respective buttons for their intended use.", ControlPanelView())
 
 bot.run(os.environ['TOKEN'])
