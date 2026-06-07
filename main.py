@@ -341,7 +341,7 @@ async def on_member_remove(member):
     try:
         async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=1):
             if entry.target.id == member.id and (datetime.now(timezone.utc) - entry.created_at).total_seconds() < 10:
-                description = f"{entry.user.mention} **kicked** {member.mention}"
+                description = f"{entry.user.mention} kicked {member.mention}"
                 if entry.reason:
                     description += f"\n**Reason:** {entry.reason}"
                 break
@@ -372,7 +372,7 @@ async def on_member_ban_add(guild, user):
     try:
         async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=1):
             if entry.target.id == user.id:
-                description = f"{entry.user.mention} **banned** {user.mention}"
+                description = f"{entry.user.mention} banned {user.mention}"
                 if entry.reason:
                     description += f"\n**Reason:** {entry.reason}"
                 break
