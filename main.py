@@ -1,4 +1,5 @@
 import os
+import asyncio
 from datetime import datetime, timezone, timedelta
 import discord
 from discord.ext import commands
@@ -26,8 +27,8 @@ PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True 
+intents.moderation = True
 intents.emojis = False
-intents.scheduled_events = False
 intents.typing = False
 intents.presences = False
 
@@ -203,11 +204,9 @@ class ControlPanelView(discord.ui.View):
             return
 
         now = datetime.now(timezone.utc)
-        target_hours = [1, 4, 7, 10, 13, 16, 19, 22]
-
         future_times = [
             t if (t := now.replace(hour=h, minute=30, second=0, microsecond=0)) > now else t + timedelta(days=1)
-            for h in target_hours
+            for h in [1, 4, 7, 10, 13, 16, 19, 22]
         ]
 
         unix_timestamp = int(min(future_times).timestamp())
@@ -317,6 +316,71 @@ async def on_member_join(member):
             await log_channel.send(embed=embed, view=view)
         except discord.DiscordException:
             pass
+
+@bot.event
+async def on_member_remove(member):
+    log_channel = member.guild.get_channel(LOGS_CHANNEL)
+    if not log_channel:
+        return
+
+    description = f"{member.mention} has left the server."
+    guild = member.guild
+
+    await asyncio.sleep(1)
+
+    try:
+        async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=1):
+            if entry.target.id == member.id and (datetime.now(timezone.utc) - entry.created_at).total_seconds() < 10:
+                description = f"{entry.user.mention} **kicked** {member.mention}"
+                if entry.reason:
+                    description += f"\n**Reason:** {entry.reason}"
+                break
+    except discord.Forbidden:
+        pass
+    except discord.DiscordException:
+        pass
+
+    embed = discord.Embed(description=description, color=PANEL_COLOR)
+    if member.avatar:
+        embed.set_author(name=member.display_name, icon_url=member.avatar.url)
+    else:
+        embed.set_author(name=member.display_name)
+
+    try:
+        await log_channel.send(embed=embed)
+    except discord.DiscordException:
+        pass
+
+@bot.event
+async def on_member_ban_add(guild, user):
+    log_channel = guild.get_channel(LOGS_CHANNEL)
+    if not log_channel:
+        return
+
+    description = f"{user.mention} was banned from the server."
+
+    try:
+        async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=1):
+            if entry.target.id == user.id:
+                description = f"{entry.user.mention} **banned** {user.mention}"
+                if entry.reason:
+                    description += f"\n**Reason:** {entry.reason}"
+                break
+    except discord.Forbidden:
+        pass
+    except discord.DiscordException:
+        pass
+
+    embed = discord.Embed(description=description, color=PANEL_COLOR)
+    if user.avatar:
+        embed.set_author(name=user.display_name, icon_url=user.avatar.url)
+    else:
+        embed.set_author(name=user.display_name)
+
+    try:
+        await log_channel.send(embed=embed)
+    except discord.DiscordException:
+        pass
 
 @bot.event
 async def on_ready():
