@@ -26,20 +26,21 @@ PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True 
-intents.moderation = True
+intents.members = True       
+intents.moderation = True    
+intents.voice_states = True  
 intents.emojis = False
 intents.typing = False
 intents.presences = False
 
-member_cache = discord.MemberCacheFlags.all()
+member_cache = discord.MemberCacheFlags.none()
 member_cache.voice = True
 
 bot = commands.Bot(
     command_prefix="!", 
     intents=intents,
     member_cache_flags=member_cache,
-    max_messages=0 
+    max_messages=0  
 )
 
 async def mass_move_users(interaction: discord.Interaction, source_ids: list, target_id: int):
