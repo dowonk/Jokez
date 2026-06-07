@@ -11,16 +11,16 @@ PVP2_VOICE = 1339058001818157207
 WAITING_ROOM_VOICE = 1472654310696419349
 VIP_VOICE = 1459658590347460782
 
+CROWS_CHANNEL = 1356415359367778498
 JOIN_VOICE_CHANNEL = 1512195785633042644
 CONTROL_PANEL_CHANNEL = 1512208972436869280
 LOGS_CHANNEL = 1339060870197678231
-CROWS_CHANNEL = 1356415359367778498
 
-PINK_ROLE = 1339053520934146058
 AUDIENCE_ROLE = 1339057300098252820
-BOUNCER_ROLE = 1339058493520478240
+JOKEZ_ROLE = 1339053887616712787
 KAWKAW_ROLE = 1356415745285689344
-JOKEZ_ROLE = PINK_ROLE 
+BOUNCER_ROLE = 1339058493520478240
+PINK_ROLE = 1339053520934146058
 
 PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 
@@ -222,21 +222,29 @@ class ControlPanelView(discord.ui.View):
         except discord.DiscordException as e:
             await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
-class MemberJoinView(discord.ui.View):
-    def __init__(self, user_id: int = None):
-        super().__init__(timeout=None)
-        if user_id:
-            self.add_audience.custom_id = f"jr_a:{user_id}"
-            self.add_jokez.custom_id = f"jr_j:{user_id}"
-            self.add_kawkaw.custom_id = f"jr_k:{user_id}"
+class MemberJoinDropdown(discord.ui.Select):
+    def __init__(self, user_id: int = 0):
+        options = [
+            discord.SelectOption(label="Audience", emoji="🟢", value=str(AUDIENCE_ROLE)),
+            discord.SelectOption(label="Jokez", emoji="🟠", value=str(JOKEZ_ROLE)),
+            discord.SelectOption(label="Kawkaw", emoji="🟡", value=str(KAWKAW_ROLE))
+        ]
+        super().__init__(
+            placeholder="Promote", 
+            min_values=1, 
+            max_values=1, 
+            options=options, 
+            custom_id=f"jr_select:{user_id}"
+        )
 
-    async def assign_role(self, interaction: discord.Interaction, role_id: int):
+    async def callback(self, interaction: discord.Interaction):
         try:
-            target_user_id = int(interaction.data['custom_id'].split(":")[1])
-        except (IndexError, ValueError, KeyError):
+            target_user_id = int(self.custom_id.split(":")[1])
+        except (IndexError, ValueError):
             await interaction.response.send_message("Error processing request.", ephemeral=True)
             return
 
+        role_id = int(self.values[0])
         guild = interaction.guild
         member = guild.get_member(target_user_id) or await guild.fetch_member(target_user_id)
         role = guild.get_role(role_id)
@@ -256,17 +264,10 @@ class MemberJoinView(discord.ui.View):
         except discord.DiscordException as e:
             await interaction.response.send_message(f"An error occurred: {e}", ephemeral=True)
 
-    @discord.ui.button(label="🟢 Audience", style=discord.ButtonStyle.secondary, custom_id="jr_a:0")
-    async def add_audience(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.assign_role(interaction, AUDIENCE_ROLE)
-
-    @discord.ui.button(label="🟠 Jokez", style=discord.ButtonStyle.secondary, custom_id="jr_j:0")
-    async def add_jokez(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.assign_role(interaction, JOKEZ_ROLE)
-
-    @discord.ui.button(label="🟡 Kawkaw", style=discord.ButtonStyle.secondary, custom_id="jr_k:0")
-    async def add_kawkaw(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.assign_role(interaction, KAWKAW_ROLE)
+class MemberJoinView(discord.ui.View):
+    def __init__(self, user_id: int = 0):
+        super().__init__(timeout=None)
+        self.add_item(MemberJoinDropdown(user_id))
 
 @bot.event
 async def on_message(message):
