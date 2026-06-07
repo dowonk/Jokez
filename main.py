@@ -129,13 +129,13 @@ class JoinVoiceChannelsView(discord.ui.View):
 
             if log_channel := guild.get_channel(LOGS_CHANNEL):
                 embed = discord.Embed(
-                    description=f"{user.mention} joined the **{channel_name}** voice channel.",
+                    description=f"{user.mention} joined **{channel_name}**.",
                     color=PANEL_COLOR
                 )
                 if user.avatar:
                     embed.set_author(name=user.display_name, icon_url=user.avatar.url)
 
-                await log_channel.send(content=f"<@&{BOUNCER_ROLE}>", embed=embed, view=None)
+                await log_channel.send(content="", embed=embed, view=None)
 
         except discord.Forbidden:
             await interaction.response.send_message("The bot doesn't have permission to move you.", ephemeral=True)
