@@ -27,7 +27,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True 
 intents.emojis = False
-intents.stickers = False
 intents.scheduled_events = False
 intents.typing = False
 intents.presences = False
