@@ -32,7 +32,7 @@ intents.emojis = False
 intents.typing = False
 intents.presences = False
 
-member_cache = discord.MemberCacheFlags.none()
+member_cache = discord.MemberCacheFlags.all()
 member_cache.voice = True
 
 bot = commands.Bot(
