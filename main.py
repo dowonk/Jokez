@@ -12,19 +12,25 @@ VIP_VOICE = 1459658590347460782
 
 JOIN_VOICE_CHANNEL = 1512195785633042644
 CONTROL_PANEL_CHANNEL = 1512208972436869280
-LOGS_CHANNEL = 1512205620751765515
+LOGS_CHANNEL = 1339060870197678231
 CROWS_CHANNEL = 1356415359367778498
 
 PINK_ROLE = 1339053520934146058
 AUDIENCE_ROLE = 1339057300098252820
 BOUNCER_ROLE = 1339058493520478240
 KAWKAW_ROLE = 1356415745285689344
+JOKEZ_ROLE = PINK_ROLE 
 
 PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True 
+intents.emojis = False
+intents.stickers = False
+intents.scheduled_events = False
+intents.typing = False
+intents.presences = False
 
 member_cache = discord.MemberCacheFlags.none()
 member_cache.voice = True
@@ -65,18 +71,15 @@ async def mass_move_users(interaction: discord.Interaction, source_ids: list, ta
             except discord.DiscordException:
                 continue
 
-    await interaction.followup.send(
-        f"Moved **{moved_count}** member(s) to {target_channel.mention}.", 
-        ephemeral=True
-    )
+    await interaction.followup.send(f"Moved **{moved_count}** member(s) to {target_channel.mention}.", ephemeral=True)
 
 class DynamicApproveJoinView(discord.ui.View):
     def __init__(self, target_user_id: int = None):
         super().__init__(timeout=None)
         if target_user_id:
-            self.approve_button.custom_id = f"approve_user_join:{target_user_id}"
+            self.approve_button.custom_id = f"app_uj:{target_user_id}"
 
-    @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="approve_user_join:placeholder")
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.green, custom_id="app_uj:0")
     async def approve_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             target_user_id = int(interaction.data['custom_id'].split(":")[1])
@@ -96,10 +99,7 @@ class DynamicApproveJoinView(discord.ui.View):
 
         if not target_user or target_user not in start_channel.members:
             user_mention = target_user.mention if target_user else f"<@{target_user_id}>"
-            await interaction.response.send_message(
-                f"{user_mention} is no longer in the waiting voice channel.", 
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"{user_mention} is no longer in the waiting voice channel.", ephemeral=True)
             return
 
         target_channel = crows_channel if len(crows_channel.members) > len(jokez_channel.members) else jokez_channel
@@ -224,6 +224,52 @@ class ControlPanelView(discord.ui.View):
         except discord.DiscordException as e:
             await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
+class MemberJoinView(discord.ui.View):
+    def __init__(self, user_id: int = None):
+        super().__init__(timeout=None)
+        if user_id:
+            self.add_audience.custom_id = f"jr_a:{user_id}"
+            self.add_jokez.custom_id = f"jr_j:{user_id}"
+            self.add_kawkaw.custom_id = f"jr_k:{user_id}"
+
+    async def assign_role(self, interaction: discord.Interaction, role_id: int):
+        try:
+            target_user_id = int(interaction.data['custom_id'].split(":")[1])
+        except (IndexError, ValueError, KeyError):
+            await interaction.response.send_message("Error processing request.", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        member = guild.get_member(target_user_id) or await guild.fetch_member(target_user_id)
+        role = guild.get_role(role_id)
+
+        if not member:
+            await interaction.response.send_message("This member is no longer in the server.", ephemeral=True)
+            return
+        if not role:
+            await interaction.response.send_message("Error: Role not found.", ephemeral=True)
+            return
+
+        try:
+            await member.add_roles(role)
+            await interaction.response.send_message(f"Successfully added {role.mention} to {member.mention}.", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("The bot does not have permissions to manage roles.", ephemeral=True)
+        except discord.DiscordException as e:
+            await interaction.response.send_message(f"An error occurred: {e}", ephemeral=True)
+
+    @discord.ui.button(label="🟢 Audience", style=discord.ButtonStyle.secondary, custom_id="jr_a:0")
+    async def add_audience(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.assign_role(interaction, AUDIENCE_ROLE)
+
+    @discord.ui.button(label="🟠 Jokez", style=discord.ButtonStyle.secondary, custom_id="jr_j:0")
+    async def add_jokez(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.assign_role(interaction, JOKEZ_ROLE)
+
+    @discord.ui.button(label="🟡 Kawkaw", style=discord.ButtonStyle.secondary, custom_id="jr_k:0")
+    async def add_kawkaw(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.assign_role(interaction, KAWKAW_ROLE)
+
 @bot.event
 async def on_message(message):
     if message.guild is None and message.author.id == 314300380051668994:
@@ -255,10 +301,30 @@ async def on_voice_state_update(member, before, after):
                 pass
 
 @bot.event
+async def on_member_join(member):
+    log_channel = member.guild.get_channel(LOGS_CHANNEL)
+    if log_channel:
+        embed = discord.Embed(
+            description=f"{member.mention} has joined the server.",
+            color=PANEL_COLOR
+        )
+        if member.avatar:
+            embed.set_author(name=member.display_name, icon_url=member.avatar.url)
+        else:
+            embed.set_author(name=member.display_name)
+        
+        view = MemberJoinView(user_id=member.id)
+        try:
+            await log_channel.send(embed=embed, view=view)
+        except discord.DiscordException:
+            pass
+
+@bot.event
 async def on_ready():
     bot.add_view(JoinVoiceChannelsView())
     bot.add_view(ControlPanelView())
     bot.add_view(DynamicApproveJoinView())
+    bot.add_view(MemberJoinView())
 
     async def setup_panel(channel_id, title, desc, view_obj):
         if not (channel := bot.get_channel(channel_id)):
