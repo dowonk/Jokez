@@ -148,11 +148,11 @@ class JoinVoiceChannelsView(discord.ui.View):
     async def join_crows(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_join(interaction, CROWS_VOICE)
 
-    @discord.ui.button(label="Join 🗡️┃pvp 1", style=discord.ButtonStyle.secondary, custom_id="join_pvp1_vc")
+    @discord.ui.button(label="Join 🗡️┃pvp 1", style=discord.ButtonStyle.blurple, custom_id="join_pvp1_vc")
     async def join_pvp1(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_join(interaction, PVP1_VOICE)
 
-    @discord.ui.button(label="Join ⚔️┃pvp 2", style=discord.ButtonStyle.secondary, custom_id="join_pvp2_vc")
+    @discord.ui.button(label="Join ⚔️┃pvp 2", style=discord.ButtonStyle.blurple, custom_id="join_pvp2_vc")
     async def join_pvp2(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_join(interaction, PVP2_VOICE)
 
