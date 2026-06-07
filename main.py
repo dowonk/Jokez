@@ -24,8 +24,17 @@ PANEL_COLOR = discord.Color.from_rgb(255, 165, 0)
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+intents.members = True 
+
+member_cache = discord.MemberCacheFlags.none()
+member_cache.voice = True
+
+bot = commands.Bot(
+    command_prefix="!", 
+    intents=intents,
+    member_cache_flags=member_cache,
+    max_messages=0 
+)
 
 async def mass_move_users(interaction: discord.Interaction, source_ids: list, target_id: int):
     guild = interaction.guild
@@ -49,7 +58,7 @@ async def mass_move_users(interaction: discord.Interaction, source_ids: list, ta
 
     moved_count = 0
     for channel in channels_to_sweep:
-        for member in channel.members:
+        for member in list(channel.members):
             try:
                 await member.move_to(target_channel)
                 moved_count += 1
@@ -76,7 +85,7 @@ class DynamicApproveJoinView(discord.ui.View):
             return
 
         guild = interaction.guild
-        target_user = guild.get_member(target_user_id)
+        target_user = guild.get_member(target_user_id) or await guild.fetch_member(target_user_id)
         start_channel = guild.get_channel(WAITING_ROOM_VOICE)
         jokez_channel = guild.get_channel(JOKEZ_VOICE)
         crows_channel = guild.get_channel(CROWS_VOICE)
@@ -110,7 +119,7 @@ class JoinVoiceChannelsView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def handle_join(self, interaction: discord.Interaction, target_channel_id: int, channel_name: str):
+    async def handle_join(self, interaction: discord.Interaction, target_channel_id: int):
         guild = interaction.guild
         user = interaction.user
 
@@ -126,17 +135,6 @@ class JoinVoiceChannelsView(discord.ui.View):
         try:
             await user.move_to(target_channel)
             await interaction.response.send_message(f"You joined {target_channel.mention}.", ephemeral=True)
-
-            if log_channel := guild.get_channel(LOGS_CHANNEL):
-                embed = discord.Embed(
-                    description=f"{user.mention} joined **{channel_name}**.",
-                    color=PANEL_COLOR
-                )
-                if user.avatar:
-                    embed.set_author(name=user.display_name, icon_url=user.avatar.url)
-
-                await log_channel.send(content="", embed=embed, view=None)
-
         except discord.Forbidden:
             await interaction.response.send_message("The bot doesn't have permission to move you.", ephemeral=True)
         except discord.DiscordException as e:
@@ -144,11 +142,11 @@ class JoinVoiceChannelsView(discord.ui.View):
 
     @discord.ui.button(label="Join 🤣┃jokez", style=discord.ButtonStyle.success, custom_id="join_jokez_vc")
     async def join_jokez(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_join(interaction, JOKEZ_VOICE, "🤣┃jokez")
+        await self.handle_join(interaction, JOKEZ_VOICE)
 
     @discord.ui.button(label="Join 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="join_crows_vc")
     async def join_crows(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.handle_join(interaction, CROWS_VOICE, "🐔┃crows")
+        await self.handle_join(interaction, CROWS_VOICE)
 
 class ControlPanelView(discord.ui.View):
     def __init__(self):
@@ -186,7 +184,7 @@ class ControlPanelView(discord.ui.View):
 
         moved_count = 0
         for ch in channels_to_scan:
-            for member in ch.members:
+            for member in list(ch.members):
                 if bouncer_role in member.roles:
                     try:
                         await member.move_to(vip_channel)
@@ -238,6 +236,23 @@ async def on_message(message):
                     pass
 
     await bot.process_commands(message)
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if after.channel and (not before.channel or before.channel.id != after.channel.id):
+        log_channel = member.guild.get_channel(LOGS_CHANNEL)
+        if log_channel:
+            embed = discord.Embed(
+                description=f"{member.mention} joined **{after.channel.name}**.",
+                color=PANEL_COLOR
+            )
+            if member.avatar:
+                embed.set_author(name=member.display_name, icon_url=member.avatar.url)
+            
+            try:
+                await log_channel.send(embed=embed)
+            except discord.DiscordException:
+                pass
 
 @bot.event
 async def on_ready():
