@@ -313,7 +313,7 @@ async def on_member_join(member):
     log_channel = member.guild.get_channel(LOGS_CHANNEL)
     if log_channel:
         embed = discord.Embed(
-            description=f"{member.mention} has joined the server.",
+            description=f"{member.mention} joined the server.",
             color=PANEL_COLOR
         )
         if member.avatar:
@@ -333,7 +333,7 @@ async def on_member_remove(member):
     if not log_channel:
         return
 
-    description = f"{member.mention} has left the server."
+    description = f"{member.mention} left the server."
     guild = member.guild
 
     await asyncio.sleep(1)
