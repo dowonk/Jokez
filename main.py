@@ -36,6 +36,8 @@ intents.presences = False
 member_cache = discord.MemberCacheFlags.all()
 member_cache.voice = True
 
+ignored_mass_moves = set()
+
 bot = commands.Bot(
     command_prefix="!", 
     intents=intents,
@@ -43,36 +45,61 @@ bot = commands.Bot(
     max_messages=0  
 )
 
-async def mass_move_users(interaction: discord.Interaction, source_ids: list, target_id: int):
+async def mass_move_users(interaction: discord.Interaction, source_ids: list, target_id: int) -> list:
     guild = interaction.guild
     author = interaction.user
 
     if not author.voice or not author.voice.channel:
         await interaction.response.send_message("You must be connected to a voice channel.", ephemeral=True)
-        return
+        return []
 
     target_channel = guild.get_channel(target_id)
     if not target_channel:
         await interaction.response.send_message("Error: Target voice channel not found.", ephemeral=True)
-        return
+        return []
 
     channels_to_sweep = [ch for cid in source_ids if (ch := guild.get_channel(cid))]
     if not channels_to_sweep:
         await interaction.response.send_message("Error: No valid source channels found.", ephemeral=True)
-        return
+        return []
 
     await interaction.response.defer(ephemeral=True)
 
-    moved_count = 0
+    moved_members = []
     for channel in channels_to_sweep:
         for member in list(channel.members):
             try:
+                ignored_mass_moves.add(member.id)
                 await member.move_to(target_channel)
-                moved_count += 1
+                moved_members.append(member)
             except discord.DiscordException:
+                ignored_mass_moves.discard(member.id)
                 continue
 
-    await interaction.followup.send(f"Moved **{moved_count}** member(s) to {target_channel.mention}.", ephemeral=True)
+    await interaction.followup.send(f"Moved **{len(moved_members)}** member(s) to {target_channel.mention}.", ephemeral=True)
+    return moved_members
+
+async def log_mass_move(guild, action_title, target_channel_mention, moved_members):
+    if not moved_members:
+        return
+        
+    log_channel = guild.get_channel(LOGS_CHANNEL)
+    if not log_channel:
+        return
+
+    mentions_str = ", ".join([m.mention for m in moved_members])
+
+    embed = discord.Embed(
+        title=action_title,
+        description=f"**Target:** {target_channel_mention}\n\n**Moved Users:**\n{mentions_str}",
+        color=PANEL_COLOR,
+        timestamp=datetime.now(timezone.utc)
+    )
+    
+    try:
+        await log_channel.send(embed=embed)
+    except discord.DiscordException:
+        pass
 
 class DynamicApproveJoinView(discord.ui.View):
     def __init__(self, target_user_id: int = None):
@@ -163,11 +190,17 @@ class ControlPanelView(discord.ui.View):
 
     @discord.ui.button(label="Move all users to 🤣┃jokez", style=discord.ButtonStyle.success, custom_id="move_to_jokez")
     async def move_to_jokez_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await mass_move_users(interaction, [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], JOKEZ_VOICE)
+        target_channel = interaction.guild.get_channel(JOKEZ_VOICE)
+        moved = await mass_move_users(interaction, [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], JOKEZ_VOICE)
+        if moved and target_channel:
+            await log_mass_move(interaction.guild, "🔄 Mass Move to Jokez", target_channel.mention, moved)
 
     @discord.ui.button(label="Move all users to 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_to_crows")
     async def move_to_crows_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await mass_move_users(interaction, [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], CROWS_VOICE)
+        target_channel = interaction.guild.get_channel(CROWS_VOICE)
+        moved = await mass_move_users(interaction, [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], CROWS_VOICE)
+        if moved and target_channel:
+            await log_mass_move(interaction.guild, "🔄 Mass Move to Crows", target_channel.mention, moved)
 
     @discord.ui.button(label="Officer Meeting 💎┃vip", style=discord.ButtonStyle.blurple, custom_id="move_bouncers_to_vip")
     async def move_bouncers_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -191,17 +224,21 @@ class ControlPanelView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
         bouncer_role = guild.get_role(BOUNCER_ROLE)
 
-        moved_count = 0
+        moved_members = []
         for ch in channels_to_scan:
             for member in list(ch.members):
                 if bouncer_role in member.roles:
                     try:
+                        ignored_mass_moves.add(member.id)
                         await member.move_to(vip_channel)
-                        moved_count += 1
+                        moved_members.append(member)
                     except discord.DiscordException:
+                        ignored_mass_moves.discard(member.id)
                         continue
 
-        await interaction.followup.send(f"Moved **{moved_count}** Bouncer(s) to {vip_channel.mention}.", ephemeral=True)
+        await interaction.followup.send(f"Moved **{len(moved_members)}** Bouncer(s) to {vip_channel.mention}.", ephemeral=True)
+        if moved_members:
+            await log_mass_move(guild, "💎 Bouncers Moved to VIP", vip_channel.mention, moved_members)
 
     @discord.ui.button(label="📢┃Crow Alert", style=discord.ButtonStyle.secondary, custom_id="crow_button", row=1)
     async def crow_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -220,11 +257,14 @@ class ControlPanelView(discord.ui.View):
 
         unix_timestamp = int(min(future_times).timestamp())
 
+        embed = discord.Embed(
+            title="KAWKAW!",
+            description=f"{interaction.user.mention} is requesting reinforcements!\n Crow spawns <t:{unix_timestamp}:R>!",
+            color=PANEL_COLOR
+        )
+
         try:
-            await ping_channel.send(
-                f"<@&{KAWKAW_ROLE}>{interaction.user.mention} is requesting reinforcements!\n"
-                f"KAWKAW! Crow spawns <t:{unix_timestamp}:R>!"
-            )
+            await ping_channel.send(content=f"<@&{KAWKAW_ROLE}>", embed=embed)
             await interaction.response.send_message(f"Pinged <@&{KAWKAW_ROLE}> in {ping_channel.mention}.", ephemeral=True)
         except discord.Forbidden:
             await interaction.response.send_message("Error: Bot does not have permission to post in that channel.", ephemeral=True)
@@ -293,6 +333,10 @@ async def on_message(message):
 
 @bot.event
 async def on_voice_state_update(member, before, after):
+    if member.id in ignored_mass_moves:
+        ignored_mass_moves.discard(member.id)
+        return
+
     if after.channel and (not before.channel or before.channel.id != after.channel.id):
         log_channel = member.guild.get_channel(LOGS_CHANNEL)
         if log_channel:
@@ -335,8 +379,6 @@ async def on_member_remove(member):
 
     description = f"{member.mention} left the server."
     guild = member.guild
-
-    await asyncio.sleep(1)
 
     try:
         async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=1):
