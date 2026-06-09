@@ -79,7 +79,7 @@ async def mass_move_users(interaction: discord.Interaction, source_ids: list, ta
     await interaction.followup.send(f"Moved **{len(moved_members)}** member(s) to {target_channel.mention}.", ephemeral=True)
     return moved_members
 
-async def log_mass_move(guild, action_title, target_channel_mention, moved_members):
+async def log_mass_move(guild, action_title, target_channel_mention, moved_members, author=None):
     if not moved_members:
         return
         
@@ -91,9 +91,13 @@ async def log_mass_move(guild, action_title, target_channel_mention, moved_membe
 
     embed = discord.Embed(
         title=action_title,
-        description=f"**Moved to:** {target_channel_mention}\n\n**Users:**\n{mentions_str}",
+        description=f"{target_channel_mention}\n\n**Users:**\n{mentions_str}",
         color=PANEL_COLOR,
     )
+    
+    if author:
+        icon_url = author.display_avatar.url if author.display_avatar else None
+        embed.set_author(name=f"Action by: {author.display_name}", icon_url=icon_url)
     
     try:
         await log_channel.send(embed=embed)
@@ -192,14 +196,14 @@ class ControlPanelView(discord.ui.View):
         target_channel = interaction.guild.get_channel(JOKEZ_VOICE)
         moved = await mass_move_users(interaction, [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], JOKEZ_VOICE)
         if moved and target_channel:
-            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved)
+            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved, author=interaction.user)
 
     @discord.ui.button(label="Move all users to 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_to_crows")
     async def move_to_crows_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         target_channel = interaction.guild.get_channel(CROWS_VOICE)
         moved = await mass_move_users(interaction, [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], CROWS_VOICE)
         if moved and target_channel:
-            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved)
+            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved, author=interaction.user)
 
     @discord.ui.button(label="Officer Meeting 💎┃vip", style=discord.ButtonStyle.blurple, custom_id="move_bouncers_to_vip")
     async def move_bouncers_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -237,7 +241,7 @@ class ControlPanelView(discord.ui.View):
 
         await interaction.followup.send(f"Moved **{len(moved_members)}** Bouncer(s) to {vip_channel.mention}.", ephemeral=True)
         if moved_members:
-            await log_mass_move(guild, "💎 Bouncers Moved to VIP", vip_channel.mention, moved_members)
+            await log_mass_move(guild, "💎 Bouncers Moved to VIP", vip_channel.mention, moved_members, author=interaction.user)
 
     @discord.ui.button(label="📢┃Crow Alert", style=discord.ButtonStyle.secondary, custom_id="crow_button", row=1)
     async def crow_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -257,7 +261,7 @@ class ControlPanelView(discord.ui.View):
         unix_timestamp = int(min(future_times).timestamp())
 
         embed = discord.Embed(
-            title="KAWKAW!",
+            title="KAWKAW",
             description=f"**Crow** spawns <t:{unix_timestamp}:R>!",
             color=PANEL_COLOR
         )
