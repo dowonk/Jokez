@@ -97,7 +97,7 @@ async def log_mass_move(guild, action_title, target_channel_mention, moved_membe
     
     if author:
         icon_url = author.display_avatar.url if author.display_avatar else None
-        embed.set_author(name=f"Action by: {author.display_name}", icon_url=icon_url)
+        embed.set_author(name=author.display_name, icon_url=icon_url)
     
     try:
         await log_channel.send(embed=embed)
