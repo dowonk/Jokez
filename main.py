@@ -91,9 +91,8 @@ async def log_mass_move(guild, action_title, target_channel_mention, moved_membe
 
     embed = discord.Embed(
         title=action_title,
-        description=f"**Target:** {target_channel_mention}\n\n**Moved Users:**\n{mentions_str}",
+        description=f"**Moved to:** {target_channel_mention}\n\n**Users:**\n{mentions_str}",
         color=PANEL_COLOR,
-        timestamp=datetime.now(timezone.utc)
     )
     
     try:
@@ -193,14 +192,14 @@ class ControlPanelView(discord.ui.View):
         target_channel = interaction.guild.get_channel(JOKEZ_VOICE)
         moved = await mass_move_users(interaction, [CROWS_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], JOKEZ_VOICE)
         if moved and target_channel:
-            await log_mass_move(interaction.guild, "🔄 Mass Move to Jokez", target_channel.mention, moved)
+            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved)
 
     @discord.ui.button(label="Move all users to 🐔┃crows", style=discord.ButtonStyle.danger, custom_id="move_to_crows")
     async def move_to_crows_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         target_channel = interaction.guild.get_channel(CROWS_VOICE)
         moved = await mass_move_users(interaction, [JOKEZ_VOICE, WAITING_ROOM_VOICE, PVP1_VOICE, PVP2_VOICE, VIP_VOICE], CROWS_VOICE)
         if moved and target_channel:
-            await log_mass_move(interaction.guild, "🔄 Mass Move to Crows", target_channel.mention, moved)
+            await log_mass_move(interaction.guild, "Mass Move", target_channel.mention, moved)
 
     @discord.ui.button(label="Officer Meeting 💎┃vip", style=discord.ButtonStyle.blurple, custom_id="move_bouncers_to_vip")
     async def move_bouncers_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -259,9 +258,11 @@ class ControlPanelView(discord.ui.View):
 
         embed = discord.Embed(
             title="KAWKAW!",
-            description=f"{interaction.user.mention} is requesting reinforcements!\n Crow spawns <t:{unix_timestamp}:R>!",
+            description=f"{interaction.user.mention} is requesting reinforcements!\n **Crow** spawns <t:{unix_timestamp}:R>!",
             color=PANEL_COLOR
         )
+
+        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
 
         try:
             await ping_channel.send(content=f"<@&{KAWKAW_ROLE}>", embed=embed)
