@@ -258,11 +258,11 @@ class ControlPanelView(discord.ui.View):
 
         embed = discord.Embed(
             title="KAWKAW!",
-            description=f"{interaction.user.mention} is requesting reinforcements!\n **Crow** spawns <t:{unix_timestamp}:R>!",
+            description=f"**Crow** spawns <t:{unix_timestamp}:R>!",
             color=PANEL_COLOR
         )
 
-        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
+        embed.set_author(name=f"{interaction.user.display_name} is requesting reinforcements!", icon_url=interaction.user.display_avatar.url)
 
         try:
             await ping_channel.send(content=f"<@&{KAWKAW_ROLE}>", embed=embed)
