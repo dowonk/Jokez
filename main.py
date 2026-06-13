@@ -262,7 +262,7 @@ class ControlPanelView(discord.ui.View):
 
         embed = discord.Embed(
             title="KAWKAW",
-            description=f"**Crow** spawns <t:{unix_timestamp}:R>!",
+            description=f"**Crow's Cache** spawns <t:{unix_timestamp}:R>!",
             color=PANEL_COLOR
         )
 
@@ -455,7 +455,7 @@ async def on_ready():
         await channel.send(embed=discord.Embed(title=title, description=desc, color=PANEL_COLOR), view=view_obj)
 
     await setup_panel(JOIN_VOICE_CHANNEL, "Join Voice Channels", "You must be in a voice channel before you can click a button.", JoinVoiceChannelsView())
-    await setup_panel(CONTROL_PANEL_CHANNEL, "Control Panel", "Welcome to the Control Panel. Click the following buttons for their intended use.", ControlPanelView())
+    await setup_panel(CONTROL_PANEL_CHANNEL, "Control Panel", "Click the following buttons for their intended use.", ControlPanelView())
     print(f"Logged in as {bot.user}")
 
 bot.run(os.environ['TOKEN'])
