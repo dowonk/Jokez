@@ -266,7 +266,7 @@ class ControlPanelView(discord.ui.View):
             color=PANEL_COLOR
         )
 
-        embed.set_author(name=f"{interaction.user.display_name} is requesting reinforcements!", icon_url=interaction.user.display_avatar.url)
+        embed.set_author(name=f"{interaction.user.display_name} is requesting reinforcements", icon_url=interaction.user.display_avatar.url)
         embed.set_thumbnail(url="https://i.imgur.com/89JOBF6.png")
 
         try:
