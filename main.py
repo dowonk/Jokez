@@ -11,7 +11,7 @@ PVP2_VOICE = 1339058001818157207
 WAITING_ROOM_VOICE = 1472654310696419349
 VIP_VOICE = 1459658590347460782
 
-CROWS_CHANNEL = 1356415359367778498
+CROW_ALERTS_CHANNEL = 1517316662641033236
 JOIN_VOICE_CHANNEL = 1512195785633042644
 CONTROL_PANEL_CHANNEL = 1512208972436869280
 LOGS_CHANNEL = 1339060870197678231
@@ -246,7 +246,7 @@ class ControlPanelView(discord.ui.View):
     @discord.ui.button(label="📢┃Crow Alert", style=discord.ButtonStyle.secondary, custom_id="crow_button", row=1)
     async def crow_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
-        ping_channel = guild.get_channel(CROWS_CHANNEL)
+        ping_channel = guild.get_channel(CROW_ALERTS_CHANNEL)
 
         if not ping_channel:
             await interaction.response.send_message("Error: Crows channel not found.", ephemeral=True)
@@ -269,8 +269,8 @@ class ControlPanelView(discord.ui.View):
         embed.set_author(name=f"{interaction.user.display_name} is requesting reinforcements!", icon_url=interaction.user.display_avatar.url)
 
         try:
-            await ping_channel.send(content=f"<@&{KAWKAW_ROLE}>", embed=embed)
-            await interaction.response.send_message(f"Pinged <@&{KAWKAW_ROLE}> in {ping_channel.mention}.", ephemeral=True)
+            await ping_channel.send(content=f"<@&{AUDIENCE_ROLE}><@&{JOKERZ_ROLE}><@&{KAWKAW_ROLE}>", embed=embed)
+            await interaction.response.send_message(f"Created alert in {ping_channel.mention}.", ephemeral=True)
         except discord.Forbidden:
             await interaction.response.send_message("Error: Bot does not have permission to post in that channel.", ephemeral=True)
         except discord.DiscordException as e:
