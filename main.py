@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 import discord
 from discord.ext import commands
+import webserver
 
 JOKEZ_VOICE = 1339052615832567811
 CROWS_VOICE = 1474894816088162365
@@ -458,5 +459,6 @@ async def on_ready():
     await setup_panel(JOIN_VOICE_CHANNEL, "Join Voice Channels", "You must be in a voice channel before you can click a button.", JoinVoiceChannelsView())
     await setup_panel(CONTROL_PANEL_CHANNEL, "Control Panel", "Click the following buttons for their intended use.", ControlPanelView())
     print(f"Logged in as {bot.user}")
-
+    
+webserver.keep_alive()
 bot.run(os.environ['TOKEN'])
