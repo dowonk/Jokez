@@ -281,7 +281,7 @@ class MemberJoinDropdown(discord.ui.Select):
     def __init__(self, user_id: int = 0):
         options = [
             discord.SelectOption(label="Audience", emoji="🟢", value=str(AUDIENCE_ROLE)),
-            discord.SelectOption(label="Jokez", emoji="🟠", value=str(JOKEZ_ROLE)),
+            discord.SelectOption(label="Jokez", emoji="🟠", value=str(JOKERZ_ROLE)),
             discord.SelectOption(label="Kawkaw", emoji="🟡", value=str(KAWKAW_ROLE))
         ]
         super().__init__(
