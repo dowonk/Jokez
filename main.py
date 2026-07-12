@@ -4,11 +4,11 @@ from datetime import datetime, timezone, timedelta
 import discord
 from discord.ext import commands
 
+WAITING_ROOM_VOICE = 1472654310696419349
 JOKEZ_VOICE = 1339052615832567811
 CROWS_VOICE = 1474894816088162365
 PVP1_VOICE = 1339057971803586590
 PVP2_VOICE = 1339058001818157207
-WAITING_ROOM_VOICE = 1472654310696419349
 VIP_VOICE = 1459658590347460782
 
 CROW_ALERTS_CHANNEL = 1517316662641033236
@@ -341,6 +341,15 @@ async def on_message(message):
 async def on_voice_state_update(member, before, after):
     if member.id in ignored_mass_moves:
         ignored_mass_moves.discard(member.id)
+        return
+
+    if after.channel and after.channel.id == WAITING_ROOM_VOICE:
+        jokez_channel = member.guild.get_channel(JOKEZ_VOICE)
+        if jokez_channel:
+            try:
+                await member.move_to(jokez_channel)
+            except discord.HTTPException:
+                pass
         return
 
     if after.channel and (not before.channel or before.channel.id != after.channel.id):
